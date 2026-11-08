@@ -319,23 +319,6 @@
   .gift.opened .cap { display: none; }
   @keyframes popGift { 0% { transform: scale(1); } 50% { transform: scale(1.4) rotate(10deg); } 100% { transform: scale(1); } }
 
-  /* ---------- gallery ---------- */
-  .gal-sec { padding-bottom: 90px; }
-  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .polaroid {
-    background: #fff; padding: 8px 8px 26px; border-radius: 6px;
-    box-shadow: 0 16px 34px -18px rgba(58,31,43,.45);
-    cursor: pointer; position: relative; transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s ease;
-  }
-  .polaroid:nth-child(3n+1) { transform: rotate(-2.5deg); }
-  .polaroid:nth-child(3n+2) { transform: rotate(1.8deg); }
-  .polaroid:nth-child(3n+3) { transform: rotate(-1.2deg); }
-  .polaroid:hover { transform: rotate(0) scale(1.05) translateY(-4px); box-shadow: 0 26px 46px -18px rgba(194,24,91,.5); z-index: 2; }
-  .polaroid .frame { aspect-ratio: 1; border-radius: 3px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg,#fde2e8,#e9d5ff); font-size: 30px; }
-  .polaroid .frame img { width: 100%; height: 100%; object-fit: cover; }
-  .polaroid .cap { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font-family: 'Playfair Display', serif; font-style: italic; font-size: 12px; color: #a07a89; }
-  .polaroid input { display: none; }
-
   /* ---------- music ---------- */
   .music-sec { padding-bottom: 90px; }
   .player { display: flex; flex-direction: column; gap: 14px; }
@@ -383,7 +366,6 @@
 
   @media (max-width: 520px) {
     .info-grid { grid-template-columns: 1fr; }
-    .gallery { grid-template-columns: repeat(2, 1fr); }
     .letter { padding: 34px 22px 28px; }
     .panel { padding: 26px 20px; }
     .gifts { grid-template-columns: 1fr; }
@@ -627,9 +609,9 @@
           <button class="btn btn-solid" id="playBtn">▶ Putar</button>
           <button class="btn btn-line" id="pickBtn">📂 Pilih lagu (Bruno Major)</button>
         </div>
-        <div class="track" id="trackName">Belum ada lagu dipilih. Pilih file mp3 Bruno Major kamu ya~</div>
-        <audio id="audio" controls></audio>
-        <p class="tip">Muehehehehhe>
+        <div class="track" id="trackName">🎶 <b>Bruno Major</b> siap diputar~</div>
+        <audio id="audio" src="bruno.mp3" controls loop preload="auto"></audio>
+        <p class="tip">Muehehehehhe</p>
       </div>
     </section>
 
@@ -717,8 +699,11 @@
   /* ================= intro ================= */
   const intro = $('intro');
   let opened = false;
+  let wantsAutoPlay = false;
+
   $('openBtn').addEventListener('click', () => {
     if (opened) return; opened = true;
+    wantsAutoPlay = true;
     intro.classList.add('hidden');
     document.body.style.overflow = '';
     setTimeout(() => confetti(80), 250);
@@ -780,24 +765,6 @@
     chime();
   });
 
-  /* ================= gallery ================= */
-  document.querySelectorAll('.polaroid').forEach(card => {
-    const input = card.querySelector('input');
-    const frame = card.querySelector('.frame');
-    input.addEventListener('change', () => {
-      const f = input.files && input.files[0];
-      if (!f) return;
-      const reader = new FileReader();
-      reader.onload = ev => {
-        frame.innerHTML = '';
-        const img = document.createElement('img');
-        img.src = ev.target.result;
-        frame.appendChild(img);
-      };
-      reader.readAsDataURL(f);
-    });
-  });
-
   /* ================= gifts ================= */
   document.querySelectorAll('.gift').forEach(g => {
     g.addEventListener('click', () => {
@@ -817,30 +784,48 @@
   fileInput.type = 'file'; fileInput.accept = 'audio/*'; fileInput.style.display = 'none';
   document.body.appendChild(fileInput);
 
-  function setTrack(file, label) {
-    audio.src = URL.createObjectURL(file);
-    trackName.innerHTML = '🎶 <b>' + (label || file.name) + '</b>';
+  let audioLoaded = true; // default src="bruno.mp3" sudah langsung terpasang
+
+  function setTrackUrl(url, label) {
+    if (audio.getAttribute('src') !== url) {
+      audio.src = url;
+      audio.load();
+    }
+    audioLoaded = true;
+    const cleanName = decodeURIComponent(label || url.split('/').pop()).replace(/\.[^/.]+$/, "");
+    trackName.innerHTML = '🎶 <b>' + cleanName + '</b>';
+    if (wantsAutoPlay && audio.paused) {
+      tryPlayAudio();
+    }
   }
+
   function playAudio() {
-    if (!audio.src) { fileInput.click(); return; }
+    if (!audioLoaded && !audio.getAttribute('src')) { fileInput.click(); return; }
     audio.play().then(() => {
-      playBtn.textContent = '⏸ Pause';
-      fab.textContent = '⏸';
-      fab.classList.add('playing');
+      syncState();
     }).catch(() => {});
   }
+
   function tryPlayAudio() {
-    if (!audio.src) { fileInput.click(); return; }
+    // Jangan pernah memicu fileInput.click() saat klik tombol pembuka!
+    if (!audio.getAttribute('src')) return;
     audio.play().then(() => {
-      playBtn.textContent = '⏸ Pause';
-      fab.textContent = '⏸';
-      fab.classList.add('playing');
-    }).catch(() => {});
+      syncState();
+    }).catch(() => {
+      audio.addEventListener('canplay', function onCanPlay() {
+        audio.removeEventListener('canplay', onCanPlay);
+        if (wantsAutoPlay && audio.paused) {
+          audio.play().then(syncState).catch(() => {});
+        }
+      });
+    });
   }
+
   function toggleAudio() {
-    if (!audio.src) { fileInput.click(); return; }
+    if (!audio.getAttribute('src')) { fileInput.click(); return; }
     if (audio.paused) playAudio(); else { audio.pause(); }
   }
+
   function syncState() {
     if (audio.paused) {
       playBtn.textContent = '▶ Putar';
@@ -852,6 +837,7 @@
       fab.classList.add('playing');
     }
   }
+
   audio.addEventListener('play', syncState);
   audio.addEventListener('pause', syncState);
   audio.addEventListener('ended', syncState);
@@ -860,18 +846,117 @@
   pickBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => {
     const f = fileInput.files && fileInput.files[0];
-    if (f) { setTrack(f); playAudio(); }
+    if (f) {
+      const url = URL.createObjectURL(f);
+      setTrackUrl(url, f.name);
+      playAudio();
+    }
   });
 
-  // auto-load bruno.mp3 if present
-  fetch('bruno.mp3', { cache: 'no-store' })
-    .then(r => { if (r.ok) return r.blob(); throw 0; })
-    .then(b => {
-      const f = new File([b], 'bruno.mp3', { type: 'audio/mpeg' });
-      setTrack(f, 'bruno.mp3');
-      trackName.innerHTML = '🎶 <b>bruno.mp3</b> siap diputar';
-    })
-    .catch(() => {});
+  // 1) Deteksi otomatis semua file .mp3 di repositori GitHub menggunakan GitHub API (tanpa peduli apa nama filenya)
+  async function findAudioFromGitHubRepo() {
+    try {
+      const host = window.location.hostname;
+      if (host.endsWith('github.io')) {
+        const user = host.split('.')[0];
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        const repo = pathParts[0] || 'HappybirthdayCacaSayanggg';
+        const apiUrl = `https://api.github.com/repos/${user}/${repo}/contents/`;
+        const res = await fetch(apiUrl);
+        if (res.ok) {
+          const items = await res.json();
+          for (const item of items) {
+            if (item.type === 'file' && /\.(mp3|m4a|ogg|wav)$/i.test(item.name)) {
+              setTrackUrl(encodeURI(item.name), 'Bruno Major — ' + item.name);
+              return true;
+            }
+          }
+          for (const item of items) {
+            if (item.type === 'dir') {
+              const subRes = await fetch(item.url);
+              if (subRes.ok) {
+                const subItems = await subRes.json();
+                for (const sub of subItems) {
+                  if (sub.type === 'file' && /\.(mp3|m4a|ogg|wav)$/i.test(sub.name)) {
+                    setTrackUrl(encodeURI(item.name + '/' + sub.name), 'Bruno Major — ' + sub.name);
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  // 2) Daftar kandidat nama file jika nama filenya bukan bruno.mp3
+  const candidateFiles = [
+    'bruno.mp3',
+    'Bruno.mp3',
+    'bruno.mp3.mp3',
+    'bruno-major.mp3',
+    'Bruno Major.mp3',
+    'lagu.mp3',
+    'music.mp3',
+    'Nothing.mp3',
+    'nothing.mp3',
+    'Easily.mp3',
+    'easily.mp3',
+    'The Most Beautiful Thing.mp3',
+    'Bruno Major - Nothing.mp3',
+    'Bruno Major - Easily.mp3',
+    'Bruno Major - The Most Beautiful Thing.mp3',
+    'minta maaf/bruno.mp3',
+    'minta maaf/Bruno.mp3',
+    'minta maaf/bruno-major.mp3',
+    'minta maaf/Bruno Major.mp3',
+    'minta maaf/lagu.mp3',
+    'minta maaf/Nothing.mp3',
+    'minta maaf/Easily.mp3',
+    'minta maaf/Bruno Major - Nothing.mp3',
+    'minta maaf/Bruno Major - Easily.mp3',
+    'minta maaf/Bruno Major - The Most Beautiful Thing.mp3'
+  ];
+
+  function probeAudioElement(src) {
+    return new Promise((resolve) => {
+      const tempAudio = new Audio();
+      const cleanup = () => {
+        tempAudio.onloadedmetadata = null;
+        tempAudio.onerror = null;
+      };
+      tempAudio.onloadedmetadata = () => { cleanup(); resolve(true); };
+      tempAudio.onerror = () => { cleanup(); resolve(false); };
+      tempAudio.src = src;
+    });
+  }
+
+  (async function autoLoadAudio() {
+    // Jika bruno.mp3 langsung ada di sebelah index.html, tidak perlu ganti src
+    const defaultOk = await probeAudioElement('bruno.mp3');
+    if (defaultOk) {
+      setTrackUrl('bruno.mp3', 'Bruno Major');
+      return;
+    }
+
+    // Coba scan dari GitHub API jika di-hosting di github.io
+    const foundInRepo = await findAudioFromGitHubRepo();
+    if (foundInRepo) return;
+
+    // Cek kandidat nama file lainnya
+    for (const path of candidateFiles) {
+      if (path === 'bruno.mp3') continue;
+      const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+      const ok = await probeAudioElement(encodedPath);
+      if (ok) {
+        const name = path.split('/').pop();
+        setTrackUrl(encodedPath, 'Bruno Major — ' + name);
+        return;
+      }
+    }
+  })();
 
   /* ================= surprise ================= */
   $('surpriseBtn').addEventListener('click', () => {
