@@ -36,7 +36,7 @@
   /* ---------- atmosphere ---------- */
   .grain {
     position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: .5;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.055'/%3E%3C/filter%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
     mix-blend-mode: multiply;
   }
   .blobs { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
@@ -334,7 +334,11 @@
   .btn-line:hover { background: #fff5f9; }
   .track { font-size: 13px; color: var(--muted); }
   .track b { color: var(--rose); }
-  audio { width: 100%; height: 42px; border-radius: 12px; }
+  
+  /* YouTube embed container style */
+  .yt-container { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; border-radius: 16px; overflow: hidden; background: #000; box-shadow: 0 12px 30px rgba(0,0,0,.15); }
+  .yt-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+
   .tip { font-size: 12px; color: var(--muted); line-height: 1.6; }
 
   /* ---------- finale ---------- */
@@ -601,17 +605,15 @@
     <section class="section music-sec reveal">
       <div class="sec-head">
         <div class="kicker">Sambil dengerin</div>
-        <h2>Musik Latar</h2>
+        <h2>Musik Latar (YouTube)</h2>
         <p>Biar makin syahdu 🎷</p>
       </div>
       <div class="panel player">
-        <div class="player-row">
-          <button class="btn btn-solid" id="playBtn">▶ Putar</button>
-          <button class="btn btn-line" id="pickBtn">📂 Pilih lagu (Bruno Major)</button>
+        <div class="yt-container">
+          <!-- YouTube embed dengan parameter autoplay=1 supaya langsung putar saat dibuka/diklik -->
+          <iframe id="ytPlayer" src="https://www.youtube.com/embed/sSvAFjpLaGA?enablejsapi=1&autoplay=1&loop=1&playlist=sSvAFjpLaGA" allow="autoplay; encrypted-media" allowfullscreen></iframe>
         </div>
-        <div class="track" id="trackName">🎶 <b>Bruno Major</b> siap diputar~</div>
-        <audio id="audio" src="https://raw.githubusercontent.com/ChickenKatsui/HappybirthdayCacaSayanggg/main/bruno.mp3" controls loop preload="auto" crossorigin="anonymous"></audio>
-        <p class="tip">Muehehehehhe</p>
+        <p class="tip">🎶 Lagu Bruno Major dari YouTube siap menemani harimu~</p>
       </div>
     </section>
 
@@ -699,16 +701,13 @@
   /* ================= intro ================= */
   const intro = $('intro');
   let opened = false;
-  let wantsAutoPlay = false;
 
   $('openBtn').addEventListener('click', () => {
     if (opened) return; opened = true;
-    wantsAutoPlay = true;
     intro.classList.add('hidden');
     document.body.style.overflow = '';
     setTimeout(() => confetti(80), 250);
     chime();
-    tryPlayAudio();
     document.querySelector('.hero').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   document.body.style.overflow = 'hidden';
@@ -748,6 +747,7 @@
   /* ================= days together ================= */
   const start = new Date(2025, 3, 7);
   const days = Math.floor((Date.now() - start.getTime()) / 864e5);
+  $('daysTogether').nodes = days.toLocaleString('id-ID');
   $('daysTogether').textContent = days.toLocaleString('id-ID');
   $('monthsTogether').textContent = Math.floor(days / 30);
   $('ldrDays').textContent = days.toLocaleString('id-ID');
@@ -771,88 +771,6 @@
       g.classList.toggle('opened');
       if (opening) { confetti(24); chime(); }
     });
-  });
-
-  /* ================= music ================= */
-  const audio = $('audio');
-  const playBtn = $('playBtn');
-  const pickBtn = $('pickBtn');
-  const trackName = $('trackName');
-  const fab = $('fab');
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file'; fileInput.accept = 'audio/*'; fileInput.style.display = 'none';
-  document.body.appendChild(fileInput);
-
-  const sources = [
-    'https://raw.githubusercontent.com/ChickenKatsui/HappybirthdayCacaSayanggg/main/bruno.mp3',
-    'https://cdn.jsdelivr.net/gh/ChickenKatsui/HappybirthdayCacaSayanggg@main/bruno.mp3',
-    'bruno.mp3',
-    'bruno.mp3.mp3'
-  ];
-  let currentSourceIdx = 0;
-
-  audio.addEventListener('error', () => {
-    currentSourceIdx++;
-    if (currentSourceIdx < sources.length) {
-      audio.removeAttribute('crossorigin');
-      audio.src = sources[currentSourceIdx];
-      audio.load();
-      if (wantsAutoPlay) {
-        audio.play().then(syncState).catch(() => {});
-      }
-    }
-  });
-
-  function playAudio() {
-    audio.play().then(() => {
-      syncState();
-    }).catch(() => {});
-  }
-
-  function tryPlayAudio() {
-    audio.play().then(() => {
-      syncState();
-    }).catch(() => {
-      audio.addEventListener('canplay', function onCanPlay() {
-        audio.removeEventListener('canplay', onCanPlay);
-        if (wantsAutoPlay && audio.paused) {
-          audio.play().then(syncState).catch(() => {});
-        }
-      });
-    });
-  }
-
-  function toggleAudio() {
-    if (audio.paused) playAudio(); else { audio.pause(); }
-  }
-
-  function syncState() {
-    if (audio.paused) {
-      playBtn.textContent = '▶ Putar';
-      fab.textContent = '🎵';
-      fab.classList.remove('playing');
-    } else {
-      playBtn.textContent = '⏸ Pause';
-      fab.textContent = '⏸';
-      fab.classList.add('playing');
-    }
-  }
-
-  audio.addEventListener('play', syncState);
-  audio.addEventListener('pause', syncState);
-  audio.addEventListener('ended', syncState);
-  playBtn.addEventListener('click', toggleAudio);
-  fab.addEventListener('click', toggleAudio);
-  pickBtn.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', () => {
-    const f = fileInput.files && fileInput.files[0];
-    if (f) {
-      audio.removeAttribute('crossorigin');
-      audio.src = URL.createObjectURL(f);
-      audio.load();
-      trackName.innerHTML = '🎶 <b>' + f.name.replace(/\.[^/.]+$/, "") + '</b>';
-      playAudio();
-    }
   });
 
   /* ================= surprise ================= */
