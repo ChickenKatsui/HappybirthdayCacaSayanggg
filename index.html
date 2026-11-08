@@ -36,7 +36,7 @@
   /* ---------- atmosphere ---------- */
   .grain {
     position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: .5;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.055'/%3E%3C/filter%3E%3C/svg%3E");
     mix-blend-mode: multiply;
   }
   .blobs { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
@@ -610,7 +610,7 @@
           <button class="btn btn-line" id="pickBtn">📂 Pilih lagu (Bruno Major)</button>
         </div>
         <div class="track" id="trackName">🎶 <b>Bruno Major</b> siap diputar~</div>
-        <audio id="audio" src="bruno.mp3" controls loop preload="auto"></audio>
+        <audio id="audio" src="https://raw.githubusercontent.com/ChickenKatsui/HappybirthdayCacaSayanggg/main/bruno.mp3" controls loop preload="auto" crossorigin="anonymous"></audio>
         <p class="tip">Muehehehehhe</p>
       </div>
     </section>
@@ -740,7 +740,6 @@
 
   /* ================= age ================= */
   (function age() {
-    // Anggap hari ini adalah hari ulang tahunnya (9 November).
     const a = new Date().getFullYear() - 2002;
     const tagline = document.querySelector('.hero .eyebrow');
     if (tagline) tagline.textContent = '9 November · ' + a + ' tahun';
@@ -784,31 +783,33 @@
   fileInput.type = 'file'; fileInput.accept = 'audio/*'; fileInput.style.display = 'none';
   document.body.appendChild(fileInput);
 
-  let audioLoaded = true; // default src="bruno.mp3" sudah langsung terpasang
+  const sources = [
+    'https://raw.githubusercontent.com/ChickenKatsui/HappybirthdayCacaSayanggg/main/bruno.mp3',
+    'https://cdn.jsdelivr.net/gh/ChickenKatsui/HappybirthdayCacaSayanggg@main/bruno.mp3',
+    'bruno.mp3',
+    'bruno.mp3.mp3'
+  ];
+  let currentSourceIdx = 0;
 
-  function setTrackUrl(url, label) {
-    if (audio.getAttribute('src') !== url) {
-      audio.src = url;
+  audio.addEventListener('error', () => {
+    currentSourceIdx++;
+    if (currentSourceIdx < sources.length) {
+      audio.removeAttribute('crossorigin');
+      audio.src = sources[currentSourceIdx];
       audio.load();
+      if (wantsAutoPlay) {
+        audio.play().then(syncState).catch(() => {});
+      }
     }
-    audioLoaded = true;
-    const cleanName = decodeURIComponent(label || url.split('/').pop()).replace(/\.[^/.]+$/, "");
-    trackName.innerHTML = '🎶 <b>' + cleanName + '</b>';
-    if (wantsAutoPlay && audio.paused) {
-      tryPlayAudio();
-    }
-  }
+  });
 
   function playAudio() {
-    if (!audioLoaded && !audio.getAttribute('src')) { fileInput.click(); return; }
     audio.play().then(() => {
       syncState();
     }).catch(() => {});
   }
 
   function tryPlayAudio() {
-    // Jangan pernah memicu fileInput.click() saat klik tombol pembuka!
-    if (!audio.getAttribute('src')) return;
     audio.play().then(() => {
       syncState();
     }).catch(() => {
@@ -822,7 +823,6 @@
   }
 
   function toggleAudio() {
-    if (!audio.getAttribute('src')) { fileInput.click(); return; }
     if (audio.paused) playAudio(); else { audio.pause(); }
   }
 
@@ -847,116 +847,13 @@
   fileInput.addEventListener('change', () => {
     const f = fileInput.files && fileInput.files[0];
     if (f) {
-      const url = URL.createObjectURL(f);
-      setTrackUrl(url, f.name);
+      audio.removeAttribute('crossorigin');
+      audio.src = URL.createObjectURL(f);
+      audio.load();
+      trackName.innerHTML = '🎶 <b>' + f.name.replace(/\.[^/.]+$/, "") + '</b>';
       playAudio();
     }
   });
-
-  // 1) Deteksi otomatis semua file .mp3 di repositori GitHub menggunakan GitHub API (tanpa peduli apa nama filenya)
-  async function findAudioFromGitHubRepo() {
-    try {
-      const host = window.location.hostname;
-      if (host.endsWith('github.io')) {
-        const user = host.split('.')[0];
-        const pathParts = window.location.pathname.split('/').filter(Boolean);
-        const repo = pathParts[0] || 'HappybirthdayCacaSayanggg';
-        const apiUrl = `https://api.github.com/repos/${user}/${repo}/contents/`;
-        const res = await fetch(apiUrl);
-        if (res.ok) {
-          const items = await res.json();
-          for (const item of items) {
-            if (item.type === 'file' && /\.(mp3|m4a|ogg|wav)$/i.test(item.name)) {
-              setTrackUrl(encodeURI(item.name), 'Bruno Major — ' + item.name);
-              return true;
-            }
-          }
-          for (const item of items) {
-            if (item.type === 'dir') {
-              const subRes = await fetch(item.url);
-              if (subRes.ok) {
-                const subItems = await subRes.json();
-                for (const sub of subItems) {
-                  if (sub.type === 'file' && /\.(mp3|m4a|ogg|wav)$/i.test(sub.name)) {
-                    setTrackUrl(encodeURI(item.name + '/' + sub.name), 'Bruno Major — ' + sub.name);
-                    return true;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch (e) {}
-    return false;
-  }
-
-  // 2) Daftar kandidat nama file jika nama filenya bukan bruno.mp3
-  const candidateFiles = [
-    'bruno.mp3',
-    'Bruno.mp3',
-    'bruno.mp3.mp3',
-    'bruno-major.mp3',
-    'Bruno Major.mp3',
-    'lagu.mp3',
-    'music.mp3',
-    'Nothing.mp3',
-    'nothing.mp3',
-    'Easily.mp3',
-    'easily.mp3',
-    'The Most Beautiful Thing.mp3',
-    'Bruno Major - Nothing.mp3',
-    'Bruno Major - Easily.mp3',
-    'Bruno Major - The Most Beautiful Thing.mp3',
-    'minta maaf/bruno.mp3',
-    'minta maaf/Bruno.mp3',
-    'minta maaf/bruno-major.mp3',
-    'minta maaf/Bruno Major.mp3',
-    'minta maaf/lagu.mp3',
-    'minta maaf/Nothing.mp3',
-    'minta maaf/Easily.mp3',
-    'minta maaf/Bruno Major - Nothing.mp3',
-    'minta maaf/Bruno Major - Easily.mp3',
-    'minta maaf/Bruno Major - The Most Beautiful Thing.mp3'
-  ];
-
-  function probeAudioElement(src) {
-    return new Promise((resolve) => {
-      const tempAudio = new Audio();
-      const cleanup = () => {
-        tempAudio.onloadedmetadata = null;
-        tempAudio.onerror = null;
-      };
-      tempAudio.onloadedmetadata = () => { cleanup(); resolve(true); };
-      tempAudio.onerror = () => { cleanup(); resolve(false); };
-      tempAudio.src = src;
-    });
-  }
-
-  (async function autoLoadAudio() {
-    // Jika bruno.mp3 langsung ada di sebelah index.html, tidak perlu ganti src
-    const defaultOk = await probeAudioElement('bruno.mp3');
-    if (defaultOk) {
-      setTrackUrl('bruno.mp3', 'Bruno Major');
-      return;
-    }
-
-    // Coba scan dari GitHub API jika di-hosting di github.io
-    const foundInRepo = await findAudioFromGitHubRepo();
-    if (foundInRepo) return;
-
-    // Cek kandidat nama file lainnya
-    for (const path of candidateFiles) {
-      if (path === 'bruno.mp3') continue;
-      const encodedPath = path.split('/').map(encodeURIComponent).join('/');
-      const ok = await probeAudioElement(encodedPath);
-      if (ok) {
-        const name = path.split('/').pop();
-        setTrackUrl(encodedPath, 'Bruno Major — ' + name);
-        return;
-      }
-    }
-  })();
 
   /* ================= surprise ================= */
   $('surpriseBtn').addEventListener('click', () => {
